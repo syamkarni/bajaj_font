@@ -1,85 +1,88 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const mime = require('mime-types');
 
-function BfhlForm() {
-  const [data, setData] = useState('');
-  const [file, setFile] = useState(null);
-  const [fileName, setFileName] = useState('');
-  const [response, setResponse] = useState(null);
-  const [error, setError] = useState('');
+const app = express();
+const PORT = process.env.PORT || 4000;
 
-  // Handle input change for the data array
-  const handleInputChange = (e) => {
-    setData(e.target.value);
-  };
+// Enable CORS to allow cross-origin requests
+app.use(cors({
+  origin: 'https://bajaj-font-git-main-syamkarnis-projects.vercel.app'  // Frontend URL without trailing slash
+}));
 
-  // Handle file input change
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setFileName(file.name);  // Capture the file name
-    const reader = new FileReader();
+app.use(bodyParser.json({ limit: '10mb' }));
 
-    reader.onloadend = () => {
-      const base64String = reader.result.replace("data:", "").replace(/^.+,/, "");
-      setFile(base64String);
+app.get("/", (req, res) => {
+  res.json({ msg: "try endpoint /bfhl" });
+});
+
+// GET endpoint
+app.get("/bfhl", (req, res) => {
+  res.status(200).json({ operation_code: 1 });
+});
+
+// POST endpoint
+app.post("/bfhl", (req, res) => {
+  try {
+    const { data, file_b64, file_name } = req.body;  // Added file_name for MIME detection
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ is_success: false, error: "Invalid input format" });
+    }
+
+    const numbers = data.filter((item) => !isNaN(item));
+    const alphabets = data.filter((item) => isNaN(item) && item.length === 1);
+    const highestLowercaseAlphabet = 
+      alphabets.filter(char => char.toLowerCase() === char)
+               .sort((a, b) => b.localeCompare(a))[0] || null;
+
+    let fileValid = false;
+    let fileMimeType = null;
+    let fileSizeKb = null;
+
+    if (file_b64) {
+      try {
+        const buffer = Buffer.from(file_b64, 'base64');
+        fileValid = true;
+
+        // Use the file_name for better MIME type detection
+        if (file_name) {
+          fileMimeType = mime.lookup(file_name) || "application/octet-stream";
+        } else {
+          fileMimeType = "application/octet-stream";  // Fallback if no file_name is provided
+        }
+
+        fileSizeKb = (buffer.length / 1024).toFixed(2);
+      } catch (error) {
+        console.error("Error processing file:", error);
+        fileValid = false;
+      }
+    }
+
+    const response = {
+      is_success: true,
+      user_id: "syam_karni_datta_uppalapti_23082003",
+      email: "ud9211@srmist.edu.in",
+      roll_number: "RA2111030010270",
+      numbers,
+      alphabets,
+      highest_lowercase_alphabet: highestLowercaseAlphabet ? [highestLowercaseAlphabet] : [],
+      file_valid: fileValid,
     };
 
-    if (file) {
-      reader.readAsDataURL(file);
+    if (fileValid) {
+      response.file_mime_type = fileMimeType;
+      response.file_size_kb = fileSizeKb;
     }
-  };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Server error:", error);
+    res.status(500).json({ is_success: false, error: "Internal server error" });
+  }
+});
 
-    const payload = {
-      data: data.split(',').map(item => item.trim()),
-      file_b64: file || '',
-      file_name: fileName || ''
-    };
-
-    try {
-      const res = await axios.post('https://bajajback-pi.vercel.app/bfhl', payload); 
-      setResponse(res.data);
-      setError('');
-    } catch (err) {
-      setError('Error submitting the form. Please check your input.');
-      console.error(err);
-    }
-  };
-
-  return (
-    <div>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Data (comma-separated):
-          <input type="text" value={data} onChange={handleInputChange} required />
-        </label>
-        <br />
-        <label>
-          Upload a file (optional):
-          <input type="file" onChange={handleFileChange} />
-        </label>
-        <br />
-        <button type="submit">Submit</button>
-      </form>
-
-      {error && <p style={{color: 'red'}}>{error}</p>}
-
-      {response && (
-        <div>
-          <h3>Response from Server</h3>
-          <p><strong>Numbers:</strong> {response.numbers.join(', ')}</p>
-          <p><strong>Alphabets:</strong> {response.alphabets.join(', ')}</p>
-          <p><strong>Highest Lowercase Alphabet:</strong> {response.highest_lowercase_alphabet.join(', ')}</p>
-          <p><strong>File Valid:</strong> {response.file_valid ? 'Yes' : 'No'}</p>
-          {response.file_mime_type && <p><strong>MIME Type:</strong> {response.file_mime_type}</p>}
-          {response.file_size_kb && <p><strong>File Size (KB):</strong> {response.file_size_kb}</p>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default BfhlForm;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
