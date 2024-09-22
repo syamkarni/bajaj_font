@@ -16,7 +16,7 @@ function BfhlForm() {
   // Handle file input change
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    setFileName(file.name);  // Capture the file name here
+    setFileName(file.name);  // Capture the file name
     const reader = new FileReader();
 
     reader.onloadend = () => {
@@ -36,11 +36,11 @@ function BfhlForm() {
     const payload = {
       data: data.split(',').map(item => item.trim()),
       file_b64: file || '',
-      file_name: fileName || ''  // Send the file name to the backend
+      file_name: fileName || ''
     };
 
     try {
-      const res = await axios.post('http://localhost:4000/bfhl', payload);
+      const res = await axios.post('https://bajajback-pi.vercel.app/bfhl', payload); 
       setResponse(res.data);
       setError('');
     } catch (err) {
